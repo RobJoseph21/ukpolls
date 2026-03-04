@@ -14,7 +14,7 @@
 :root {
   --bg: #FAFAF8;
   --text: #1a1a1a;
-  --text-muted: #666;
+  --text-muted: #555;
   --right: #006BB3;
   --right-chart: #0087DC;
   --left: #C50030;
@@ -105,7 +105,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   padding: 10px 0 6px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 .refresh-btn {
@@ -127,7 +127,7 @@ h1 {
 
 .footer {
   padding: 8px 0 16px;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
@@ -179,7 +179,7 @@ h1 {
 <body>
 
 <h1>UK Polls: Right vs Left</h1>
-<p class="subtitle">Westminster voting intention since July 2024</p>
+<p class="subtitle">UK general election polling since July 2024</p>
 
 <div class="cards">
   <div class="card right">
@@ -529,7 +529,7 @@ function renderChart(polls) {
           ticks: { maxRotation: 0, font: { size: 10 }, maxTicksLimit: 7 }
         },
         y: {
-          min: 35, max: 60,
+          min: 37, max: 57,
           ticks: { callback: v => v + '%', stepSize: 5, font: { size: 10 } },
           grid: { color: 'rgba(0,0,0,0.05)' }
         }
@@ -613,10 +613,10 @@ async function loadData() {
     loadingEl.classList.add('hidden');
     chartWrap.classList.remove('hidden');
 
-    requestAnimationFrame(() => renderChart(allPolls));
+    setTimeout(() => renderChart(allPolls), 0);
 
-    document.getElementById('pollCount').textContent = `${allPolls.length} polls loaded`;
-    document.getElementById('updated').textContent = `Updated ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    document.getElementById('pollCount').textContent = `Based on ${allPolls.length} polls`;
+    document.getElementById('updated').textContent = `Last refreshed ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
   } catch (err) {
     loadingEl.classList.add('hidden');
