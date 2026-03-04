@@ -422,6 +422,9 @@ function renderChart(polls) {
     sorted.map(p => ({ x: p.date.getTime(), y: p.left })), BANDWIDTH
   ).map(p => ({ x: new Date(p.x), y: p.y }));
 
+  // Use LOWESS endpoint for the header numbers (more stable than raw average)
+  updateHeader(rightSmooth, leftSmooth);
+
   const ctx = document.getElementById('chart').getContext('2d');
   chartInstance = new Chart(ctx, {
     type: 'scatter',
@@ -535,12 +538,10 @@ function renderChart(polls) {
   });
 }
 
-// ── Header Update ───────────────────────────────────────
-function updateHeader(polls) {
-  const sorted = [...polls].sort((a, b) => b.date - a.date);
-  const recent = sorted.slice(0, 5);
-  const avgR = recent.reduce((s, p) => s + p.right, 0) / recent.length;
-  const avgL = recent.reduce((s, p) => s + p.left, 0) / recent.length;
+// ── Header Update (uses LOWESS endpoint for stability) ──
+function updateHeader(rightSmooth, leftSmooth) {
+  const avgR = rightSmooth[rightSmooth.length - 1].y;
+  const avgL = leftSmooth[leftSmooth.length - 1].y;
   const gap = avgR - avgL;
 
   document.getElementById('rightPct').textContent = avgR.toFixed(1) + '%';
@@ -608,8 +609,6 @@ async function loadData() {
 
     // Sort chronologically
     allPolls.sort((a, b) => a.date - b.date);
-
-    updateHeader(allPolls);
 
     loadingEl.classList.add('hidden');
     chartWrap.classList.remove('hidden');
