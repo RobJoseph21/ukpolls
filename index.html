@@ -349,9 +349,11 @@ function parseSection(html) {
     const left = lab + ld + grn;
     if (right > 100 || left > 100) return;
 
+    const pollster = cells[1].textContent.trim().replace(/\[.*?\]/g, '');
+
     polls.push({
       date: new Date(dateAttr + 'T12:00:00Z'),
-      right, left, lab, con, ref, ld, grn
+      pollster, right, left, lab, con, ref, ld, grn
     });
   });
 
@@ -414,6 +416,12 @@ function renderChart(polls) {
   const rightDots = sorted.map(p => ({ x: p.date, y: p.right }));
   const leftDots  = sorted.map(p => ({ x: p.date, y: p.left }));
 
+  // Store poll metadata for tooltip lookup (same index order as dots)
+  window._pollMeta = sorted.map(p => ({
+    pollster: p.pollster, right: p.right, left: p.left,
+    con: p.con, ref: p.ref, lab: p.lab, ld: p.ld, grn: p.grn
+  }));
+
   const rightSmooth = lowess(
     sorted.map(p => ({ x: p.date.getTime(), y: p.right })), BANDWIDTH
   ).map(p => ({ x: new Date(p.x), y: p.y }));
@@ -437,7 +445,8 @@ function renderChart(polls) {
           backgroundColor: 'rgba(0, 135, 220, 0.18)',
           borderColor: 'transparent',
           pointRadius: 3,
-          pointHoverRadius: 5,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
           order: 4
         },
         {
@@ -446,7 +455,8 @@ function renderChart(polls) {
           backgroundColor: 'rgba(228, 0, 59, 0.18)',
           borderColor: 'transparent',
           pointRadius: 3,
-          pointHoverRadius: 5,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
           order: 4
         },
         // White outline (behind coloured lines)
@@ -458,6 +468,7 @@ function renderChart(polls) {
           borderWidth: 6,
           pointRadius: 0,
           pointHoverRadius: 0,
+          pointHitRadius: 0,
           tension: 0.3,
           fill: false,
           order: 2
@@ -470,6 +481,7 @@ function renderChart(polls) {
           borderWidth: 6,
           pointRadius: 0,
           pointHoverRadius: 0,
+          pointHitRadius: 0,
           tension: 0.3,
           fill: false,
           order: 2
@@ -483,6 +495,7 @@ function renderChart(polls) {
           borderWidth: 3.5,
           pointRadius: 0,
           pointHoverRadius: 0,
+          pointHitRadius: 0,
           tension: 0.3,
           fill: false,
           order: 1
@@ -495,6 +508,7 @@ function renderChart(polls) {
           borderWidth: 3.5,
           pointRadius: 0,
           pointHoverRadius: 0,
+          pointHitRadius: 0,
           tension: 0.3,
           fill: false,
           order: 1
@@ -504,19 +518,44 @@ function renderChart(polls) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'nearest', intersect: false },
+      interaction: { mode: 'nearest', intersect: true },
       plugins: {
         legend: { display: false },
         tooltip: {
-          filter: item => !item.dataset.label.startsWith('_'),
+          filter: item => item.dataset.label.includes('individual'),
+          displayColors: true,
           callbacks: {
             title: items => {
+              const meta = window._pollMeta[items[0].dataIndex];
               const d = new Date(items[0].parsed.x);
-              return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              return meta ? `${meta.pollster}, ${dateStr}` : dateStr;
             },
             label: item => {
-              const side = item.dataset.label.includes('Right') ? 'Right' : 'Left';
-              return `${side}: ${item.parsed.y.toFixed(1)}%`;
+              const meta = window._pollMeta[item.dataIndex];
+              if (!meta) return '';
+              const gap = meta.right - meta.left;
+              if (Math.abs(gap) < 0.5) return 'Tied';
+              const leader = gap > 0 ? 'Right' : 'Left';
+              return ` ${leader} +${Math.abs(gap).toFixed(1)}`;
+            },
+            labelColor: item => {
+              const meta = window._pollMeta[item.dataIndex];
+              if (!meta) return { backgroundColor: '#888', borderColor: '#888' };
+              const color = meta.right > meta.left ? RIGHT_COLOR : LEFT_COLOR;
+              return { backgroundColor: color, borderColor: color };
+            },
+            afterBody: items => {
+              const meta = window._pollMeta[items[0].dataIndex];
+              if (!meta) return [];
+              const parties = [
+                { name: 'Reform', pct: meta.ref },
+                { name: 'Conservative', pct: meta.con },
+                { name: 'Labour', pct: meta.lab },
+                { name: 'Green', pct: meta.grn },
+                { name: 'Lib Dem', pct: meta.ld }
+              ].sort((a, b) => b.pct - a.pct);
+              return parties.map(p => `${p.name} ${p.pct}%`);
             }
           }
         }
