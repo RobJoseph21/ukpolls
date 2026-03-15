@@ -179,7 +179,7 @@ h1 {
 <body>
 
 <h1>UK Polls: Right vs Left</h1>
-<p class="subtitle">UK general election polling since July 2024</p>
+<p class="subtitle">UK general election polling since the July 2024 election</p>
 
 <div class="cards">
   <div class="card right">
@@ -227,6 +227,16 @@ const LEFT_COLOR  = '#E4003B'; // chart lines
 const RIGHT_TEXT  = '#006BB3'; // text (AA contrast)
 const LEFT_TEXT   = '#C50030'; // text (AA contrast)
 const BANDWIDTH   = 0.15;
+
+// ── Election results (4 July 2024) ─────────────────────
+const ELECTION_DATE = new Date(2024, 6, 4); // 4 July 2024
+const ELECTION_CON = 23.7;
+const ELECTION_REF = 14.3;
+const ELECTION_LAB = 33.7;
+const ELECTION_LD  = 12.2;
+const ELECTION_GRN = 6.7;
+const ELECTION_RIGHT = ELECTION_CON + ELECTION_REF; // 38.0
+const ELECTION_LEFT  = ELECTION_LAB + ELECTION_LD + ELECTION_GRN; // 52.6
 
 let chartInstance = null;
 
@@ -430,6 +440,10 @@ function renderChart(polls) {
     sorted.map(p => ({ x: p.date.getTime(), y: p.left })), BANDWIDTH
   ).map(p => ({ x: new Date(p.x), y: p.y }));
 
+  // Prepend election result so trend lines connect to election dot
+  rightSmooth.unshift({ x: ELECTION_DATE, y: ELECTION_RIGHT });
+  leftSmooth.unshift({ x: ELECTION_DATE, y: ELECTION_LEFT });
+
   // Use LOWESS endpoint for the header numbers (more stable than raw average)
   updateHeader(rightSmooth, leftSmooth);
 
@@ -438,6 +452,29 @@ function renderChart(polls) {
     type: 'scatter',
     data: {
       datasets: [
+        // Election result markers
+        {
+          label: 'Right (election)',
+          data: [{ x: ELECTION_DATE, y: ELECTION_RIGHT }],
+          backgroundColor: RIGHT_COLOR,
+          borderColor: '#fff',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
+          order: 0
+        },
+        {
+          label: 'Left (election)',
+          data: [{ x: ELECTION_DATE, y: ELECTION_LEFT }],
+          backgroundColor: LEFT_COLOR,
+          borderColor: '#fff',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointHitRadius: 12,
+          order: 0
+        },
         // Scatter dots (behind everything)
         {
           label: 'Right (individual polls)',
@@ -522,16 +559,26 @@ function renderChart(polls) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          filter: item => item.dataset.label.includes('individual'),
+          filter: item => item.dataset.label.includes('individual') || item.dataset.label.includes('election'),
           displayColors: true,
           callbacks: {
             title: items => {
+              const dsLabel = items[0].dataset.label;
+              if (dsLabel.includes('election')) {
+                return '4 Jul 2024 Election Result';
+              }
               const meta = window._pollMeta[items[0].dataIndex];
               const d = new Date(items[0].parsed.x);
               const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
               return meta ? `${meta.pollster}, ${dateStr}` : dateStr;
             },
             label: item => {
+              const dsLabel = item.dataset.label;
+              if (dsLabel.includes('election')) {
+                const gap = ELECTION_RIGHT - ELECTION_LEFT;
+                const leader = gap > 0 ? 'Right' : 'Left';
+                return ` ${leader} +${Math.abs(gap).toFixed(1)}`;
+              }
               const meta = window._pollMeta[item.dataIndex];
               if (!meta) return '';
               const gap = meta.right - meta.left;
@@ -540,12 +587,28 @@ function renderChart(polls) {
               return ` ${leader} +${Math.abs(gap).toFixed(1)}`;
             },
             labelColor: item => {
+              const dsLabel = item.dataset.label;
+              if (dsLabel.includes('election')) {
+                const color = ELECTION_RIGHT > ELECTION_LEFT ? RIGHT_COLOR : LEFT_COLOR;
+                return { backgroundColor: color, borderColor: color };
+              }
               const meta = window._pollMeta[item.dataIndex];
               if (!meta) return { backgroundColor: '#888', borderColor: '#888' };
               const color = meta.right > meta.left ? RIGHT_COLOR : LEFT_COLOR;
               return { backgroundColor: color, borderColor: color };
             },
             afterBody: items => {
+              const dsLabel = items[0].dataset.label;
+              if (dsLabel.includes('election')) {
+                const parties = [
+                  { name: 'Reform', pct: ELECTION_REF },
+                  { name: 'Conservative', pct: ELECTION_CON },
+                  { name: 'Labour', pct: ELECTION_LAB },
+                  { name: 'Green', pct: ELECTION_GRN },
+                  { name: 'Lib Dem', pct: ELECTION_LD }
+                ].sort((a, b) => b.pct - a.pct);
+                return parties.map(p => `${p.name} ${p.pct}%`);
+              }
               const meta = window._pollMeta[items[0].dataIndex];
               if (!meta) return [];
               const parties = [
@@ -563,12 +626,12 @@ function renderChart(polls) {
       scales: {
         x: {
           type: 'time',
+          min: new Date(ELECTION_DATE.getTime() - 5 * 24 * 60 * 60 * 1000),
           time: { unit: 'month', displayFormats: { month: 'MMM yy' } },
           grid: { color: 'rgba(0,0,0,0.05)' },
           ticks: { maxRotation: 0, font: { size: 10 }, maxTicksLimit: 7 }
         },
         y: {
-          min: 37, max: 57,
           ticks: { callback: v => v + '%', stepSize: 5, font: { size: 10 } },
           grid: { color: 'rgba(0,0,0,0.05)' }
         }
